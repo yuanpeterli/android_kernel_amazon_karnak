@@ -78,7 +78,6 @@ int thermal_level_compare(struct mtk_cooler_platform_data *cooler_data, struct c
 }
 
 #define PREFIX "thermalsensor:def"
-#define MASK (0x0FFF)
 
 static int match(struct thermal_zone_device *tz,
 	  struct thermal_cooling_device *cdev)
@@ -678,6 +677,7 @@ static int virtual_sensor_thermal_probe(struct platform_device *pdev)
 		return -EINVAL;
 	}
 	tzone->tz->trips = pdata->num_trips;
+
 	ret = virtual_sensor_create_sysfs(tzone);
 	INIT_WORK(&tzone->therm_work, virtual_sensor_thermal_work);
 	platform_set_drvdata(pdev, tzone);

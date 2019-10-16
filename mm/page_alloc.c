@@ -1129,19 +1129,15 @@ static int try_to_steal_freepages(struct zone *zone, struct page *page,
 	return fallback_type;
 }
 
-/* Remove an element from the buddy allocator from the fallback list */
-static inline struct page *
-__rmqueue_fallback(struct zone *zone, unsigned int order, int start_migratetype)
+/* get free migrate page from fallbacks */
+static inline struct page *get_migrate_page(struct zone *zone,
+					    unsigned int order,
+					    unsigned int current_order,
+					    int start_migratetype)
 {
 	struct free_area *area;
-	unsigned int current_order;
 	struct page *page;
 	int migratetype, new_type, i;
-
-	/* Find the largest possible block of pages in the other list */
-	for (current_order = MAX_ORDER-1;
-				current_order >= order && current_order <= MAX_ORDER-1;
-				--current_order) {
 		for (i = 0;; i++) {
 			migratetype = fallbacks[start_migratetype][i];
 
@@ -1152,7 +1148,6 @@ __rmqueue_fallback(struct zone *zone, unsigned int order, int start_migratetype)
 			area = &(zone->free_area[current_order]);
 			if (list_empty(&area->free_list[migratetype]))
 				continue;
-
 			page = list_entry(area->free_list[migratetype].next,
 					struct page, lru);
 			area->nr_free--;
@@ -1170,7 +1165,7 @@ __rmqueue_fallback(struct zone *zone, unsigned int order, int start_migratetype)
 			/* The freepage_migratetype may differ from pageblock's
 			 * migratetype depending on the decisions in
 			 * try_to_steal_freepages. This is OK as long as it does
-			 * not differ for MIGRATE_CMA type.
+		 * not differ for MIGRATE_CMA type
 			 */
 			set_freepage_migratetype(page, new_type);
 
@@ -1179,6 +1174,45 @@ __rmqueue_fallback(struct zone *zone, unsigned int order, int start_migratetype)
 
 			return page;
 		}
+
+	return NULL;
+}
+
+/* Remove an element from the buddy allocator from the fallback list */
+static inline struct page *
+__rmqueue_fallback(struct zone *zone, unsigned int order, int start_migratetype)
+{
+	unsigned int current_order, end_order;
+	struct page *page;
+
+	if (unlikely(start_migratetype == MIGRATE_RECLAIMABLE ||
+	    page_group_by_mobility_disabled)) {
+		end_order = order;
+	} else {
+		end_order = max(order, (unsigned int)(pageblock_order / 2));
+	}
+
+	/* This case means it can steal the whole pages from other list */
+	/* Find the largest possible block of pages in the other list */
+	for (current_order = MAX_ORDER - 1;
+				current_order >= end_order && current_order <= MAX_ORDER - 1;
+				--current_order) {
+		page = get_migrate_page(zone, order, current_order, start_migratetype);
+		if (page)
+			return page;
+	}
+
+	if (unlikely(end_order == order))
+		return NULL;
+
+	/* This case means it can NOT steal the whole pages from other list */
+	/* Get the smallest one from other list */
+	for (current_order = order;
+				current_order < pageblock_order / 2;
+				++current_order) {
+		page = get_migrate_page(zone, order, current_order, start_migratetype);
+		if (page)
+			return page;
 	}
 
 	return NULL;

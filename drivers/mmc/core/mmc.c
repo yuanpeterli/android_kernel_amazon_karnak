@@ -418,15 +418,6 @@ static int mmc_decode_ext_csd(struct mmc_card *card, u8 *ext_csd)
 			for (idx = 0; idx < MMC_NUM_BOOT_PARTITION; idx++) {
 				int area_type = MMC_BLK_DATA_AREA_BOOT;
 				part_size = ext_csd[EXT_CSD_BOOT_MULT] << 17;
-
-#ifdef CONFIG_MMC_AMAZON_BOOT0_PL_BACKUP
-#define AMAZON_MMC_BOOT0_MIN_SIZE (0x100000)
-				if (idx == 0) {
-					BUG_ON(part_size < AMAZON_MMC_BOOT0_MIN_SIZE);
-					part_size = AMAZON_MMC_BOOT0_MIN_SIZE;
-					area_type = MMC_BLK_DATA_AREA_GP;
-				}
-#endif
 				mmc_part_add(card, part_size,
 					EXT_CSD_PART_CONFIG_ACC_BOOT0 + idx,
 					"boot%d", idx, true, area_type);
